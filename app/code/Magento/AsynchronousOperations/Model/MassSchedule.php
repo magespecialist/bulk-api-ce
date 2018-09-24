@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magento\AsynchronousOperations\Model;
 
+use Magento\Framework\App\ObjectManager;
 use Magento\Framework\DataObject\IdentityGeneratorInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\AsynchronousOperations\Api\Data\ItemStatusInterfaceFactory;
@@ -55,6 +56,11 @@ class MassSchedule
     private $operationRepository;
 
     /**
+     * @var TopicDescriptionPool
+     */
+    private $topicDescriptionPool;
+
+    /**
      * Initialize dependencies.
      *
      * @param IdentityGeneratorInterface $identityService
@@ -63,6 +69,7 @@ class MassSchedule
      * @param BulkManagementInterface $bulkManagement
      * @param LoggerInterface $logger
      * @param OperationRepository $operationRepository
+     * @param TopicDescriptionPool $topicDescriptionPool
      */
     public function __construct(
         IdentityGeneratorInterface $identityService,
@@ -70,7 +77,8 @@ class MassSchedule
         AsyncResponseInterfaceFactory $asyncResponseFactory,
         BulkManagementInterface $bulkManagement,
         LoggerInterface $logger,
-        OperationRepository $operationRepository
+        OperationRepository $operationRepository,
+        TopicDescriptionPool $topicDescriptionPool = null
     ) {
         $this->identityService = $identityService;
         $this->itemStatusInterfaceFactory = $itemStatusInterfaceFactory;
@@ -78,22 +86,35 @@ class MassSchedule
         $this->bulkManagement = $bulkManagement;
         $this->logger = $logger;
         $this->operationRepository = $operationRepository;
+        $this->topicDescriptionPool = $topicDescriptionPool ?:
+            ObjectManager::getInstance()->get(TopicDescriptionPool::class);
     }
 
     /**
      * Schedule new bulk operation based on the list of entities
      *
-     * @param $topicName
-     * @param $entitiesArray
-     * @param null $groupId
-     * @param null $userId
+     * @param string $topicName
+     * @param array $entitiesArray
+     * @param int|null $groupId
+     * @param int|null $userId
+     * @param string|null $bulkDescription
      * @return AsyncResponseInterface
      * @throws BulkException
      * @throws LocalizedException
      */
-    public function publishMass($topicName, array $entitiesArray, $groupId = null, $userId = null)
-    {
-        $bulkDescription = __('Topic %1', $topicName);
+    public function publishMass(
+        $topicName,
+        array $entitiesArray,
+        $groupId = null,
+        $userId = null,
+        $bulkDescription = null
+    ) {
+        if ($bulkDescription === null) {
+            $bulkDescription = __($this->topicDescriptionPool->getDescription($topicName));
+        }
+        if ($bulkDescription === null) {
+            $bulkDescription = __('Topic %1', $topicName);
+        }
 
         if ($groupId == null) {
             $groupId = $this->identityService->generateId();
